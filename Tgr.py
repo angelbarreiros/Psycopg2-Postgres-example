@@ -28,6 +28,7 @@ def create_table(conn):
     with conn.cursor() as cursor:
         try:
             cursor.execute(open("CreateTables.sql", "r").read())
+            conn.commit()
         except Exception as e :
             raise e
 
@@ -36,22 +37,24 @@ def drop_db(conn):
     with conn.cursor() as cursor:
         try:
             cursor.execute(sql)
+            conn.commit()
         except Exception as e:
             raise e
+def insert_Taller(conn):
+    pass
+def insert_Asistente(conn):
+    pass
+def insert_Poniente(conn):
+    pass
 
 def menu(conn):
-    """
-    Imprime un menú de opcións, solicita a opción e executa a función asociada.
-    'q' para saír.
-    """
     MENU_TEXT = """
       -- MENÚ --
-1 - Crear táboa artigo  
-2 - Eliminar Tabla 
-3 - Insertar en la tabla   
-4 - Eliminar una fila
-5 - Ver un artigo
-6 - Ver por precio
+1 - Crear la bd
+2 - Elminar la bd
+3 - Insertar un taller
+4 - Insertar un asistente
+5 - Isertar un poniente
 q - Saír   
 """
     while True:
@@ -63,6 +66,12 @@ q - Saír
             create_table(conn)
         if tecla == '2':
             drop_db(conn)
+        if tecla == '3':
+            insert_Taller(conn)
+        if tecla == '4':
+            insert_Asistente(conn)
+        if tecla == '5':
+            insert_Poniente(conn)
 
 
 
