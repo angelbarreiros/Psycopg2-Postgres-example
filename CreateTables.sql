@@ -6,7 +6,8 @@ CREATE TABLE Poniente (
     telefono VARCHAR(9) CHECK (char_length(telefono) = 9),
     correo VARCHAR(255) CHECK (position('@' in correo) > 0) UNIQUE NOT NULL ,
     dni VARCHAR(255) NOT NULL UNIQUE,
-    empresa VARCHAR(255)
+    empresa VARCHAR(255),
+    reputacion INT
 );
 
 CREATE TABLE Taller
@@ -31,13 +32,13 @@ CREATE TABLE Asistente
     apellido1    VARCHAR(255),
     apellido2    VARCHAR(255),
     telefono     VARCHAR(9) CHECK (char_length(telefono) = 9),
-    correo VARCHAR(255) CHECK (position('@' in correo) > 0) UNIQUE NOT NULL ,
+    correo       VARCHAR(255) CHECK (position('@' in correo) > 0) UNIQUE NOT NULL ,
     metodoDePago VARCHAR(255) NOT NULL,
     dni          VARCHAR(255) NOT NULL UNIQUE
 
 
 );
-CREATE TABLE TallerAsitente
+CREATE TABLE TallerAsistente
 (
     id       SERIAL
         CONSTRAINT tallerAsistente_pk PRIMARY KEY,
