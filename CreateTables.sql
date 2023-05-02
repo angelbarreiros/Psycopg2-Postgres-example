@@ -1,16 +1,14 @@
-CREATE TABLE Poniente
-(
-    id        SERIAL
-        CONSTRAINT poniente_pk PRIMARY KEY,
-    nombre    VARCHAR(255)        NOT NULL,
+CREATE TABLE Poniente (
+    id SERIAL CONSTRAINT poniente_pk PRIMARY KEY,
+    nombre VARCHAR(255) NOT NULL,
     apellido1 VARCHAR(255),
     apellido2 VARCHAR(255),
-    telefono  VARCHAR(9) check ( char_length(telefono) = 9 ),
-    correo    VARCHAR(255) UNIQUE NOT NULL,
-    dni       VARCHAR(255)        NOT NULL UNIQUE,
-    empresa   VARCHAR(255)
-
+    telefono VARCHAR(9) CHECK (char_length(telefono) = 9),
+    correo VARCHAR(255) CHECK (position('@' in correo) > 0) UNIQUE NOT NULL ,
+    dni VARCHAR(255) NOT NULL UNIQUE,
+    empresa VARCHAR(255)
 );
+
 CREATE TABLE Taller
 (
     id           SERIAL
@@ -32,8 +30,9 @@ CREATE TABLE Asistente
     nombre       VARCHAR(255) NOT NULL,
     apellido1    VARCHAR(255),
     apellido2    VARCHAR(255),
-    telefono     VARCHAR(9) check ( char_length(telefono) = 9 ),
-    metodoDePago BIGINT,
+    telefono     VARCHAR(9) CHECK (char_length(telefono) = 9),
+    correo VARCHAR(255) CHECK (position('@' in correo) > 0) UNIQUE NOT NULL ,
+    metodoDePago VARCHAR(255) NOT NULL,
     dni          VARCHAR(255) NOT NULL UNIQUE
 
 
