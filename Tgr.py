@@ -202,7 +202,7 @@ def insert_Taller(conn):
                     print(f"{bcolors.OKGREEN}Taller añadido con éxito{bcolors.ENDC}")   
                 except psycopg2.Error as e:
                     if(e.pgcode== psycopg2.errorcodes.CHECK_VIOLATION):
-                        if("taller_check" in e.pgerror):
+                        if("taller_finfecha_check" in e.pgerror):
                             print(f"{bcolors.WARNING}La fecha final no puede ser antes que la fecha inical{bcolors.ENDC}")
                     elif(e.pgcode == psycopg2.errorcodes.NOT_NULL_VIOLATION):
                         if("nombre" in e.pgerror):

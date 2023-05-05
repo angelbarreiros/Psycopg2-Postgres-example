@@ -3,8 +3,8 @@ CREATE TABLE Poniente (
     nombre VARCHAR(255) NOT NULL,
     apellido1 VARCHAR(255),
     apellido2 VARCHAR(255),
-    telefono VARCHAR(9) CHECK (char_length(telefono) = 9),
-    correo VARCHAR(255) CHECK (position('@' in correo) > 0) UNIQUE NOT NULL ,
+    telefono VARCHAR(9) CONSTRAINT poniente_telefono_check CHECK (char_length(telefono) = 9),
+    correo VARCHAR(255) CONSTRAINT poniente_correo_check CHECK (position('@' in correo) > 0) UNIQUE NOT NULL ,
     dni VARCHAR(255) NOT NULL UNIQUE,
     empresa VARCHAR(255),
     reputacion INT
@@ -20,7 +20,7 @@ CREATE TABLE Taller
 --     Es unica la fecha porque no puede ser que dos eventos se den a la misma hora
 --      empieza uno acaba otro ,(se podría hacer un check?)
     initFecha    DATE         NOT NULL UNIQUE,
-    finFecha     DATE         NOT NULL UNIQUE check (initFecha < finFecha),
+    finFecha     DATE         NOT NULL UNIQUE CONSTRAINT taller_finfecha_check check (initFecha < finFecha),
     precio       INT,
     CONSTRAINT taller_fk_poniente FOREIGN KEY (idPoniente) REFERENCES poniente (id) ON DELETE CASCADE
 );
@@ -31,8 +31,8 @@ CREATE TABLE Asistente
     nombre       VARCHAR(255) NOT NULL,
     apellido1    VARCHAR(255),
     apellido2    VARCHAR(255),
-    telefono     VARCHAR(9) CHECK (char_length(telefono) = 9),
-    correo       VARCHAR(255) CHECK (position('@' in correo) > 0) UNIQUE NOT NULL ,
+    telefono     VARCHAR(9) CONSTRAINT asistente_telefono_check CHECK (char_length(telefono) = 9),
+    correo       VARCHAR(255) CONSTRAINT asistente_correo_check CHECK (position('@' in correo) > 0) UNIQUE NOT NULL ,
     metodoDePago VARCHAR(255) NOT NULL,
     dni          VARCHAR(255) NOT NULL UNIQUE
 
