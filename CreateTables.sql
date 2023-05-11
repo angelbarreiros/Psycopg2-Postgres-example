@@ -7,7 +7,7 @@ CREATE TABLE Poniente (
     correo VARCHAR(255) CONSTRAINT poniente_correo_check CHECK (position('@' in correo) > 0) UNIQUE NOT NULL ,
     dni VARCHAR(255) NOT NULL UNIQUE,
     empresa VARCHAR(255),
-    reputacion INT
+    reputacion INT CONSTRAINT reputacion_non_negative CHECK (reputacion >= 0)
 );
 
 CREATE TABLE Taller
