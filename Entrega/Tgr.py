@@ -63,6 +63,7 @@ def drop_db(conn):
             conn.rollback()
 
 def insert_Poniente(conn):
+    conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_READ_COMMITTED)
     snombre=input("Nombre: ")
     nombre=None if snombre=="" else snombre
     sapellido1=input("Apellido1: ")
@@ -103,11 +104,12 @@ def insert_Poniente(conn):
                 elif("dni" in e.pgerror):
                     print(f"{bcolors.WARNING}dni no puede estar duplicado{bcolors.ENDC}")
             else:
-                print(f"Erro: {e.pgcode} - {e.pgerror}")
+                print(e)
             conn.rollback()
 
 
 def insert_Asistente(conn):
+    conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_READ_COMMITTED)
     snombre=input("Nombre: ")
     nombre=None if snombre=="" else snombre
     sapellido1=input("Apellido1: ")
@@ -122,8 +124,6 @@ def insert_Asistente(conn):
     metododepago=None if smetododepago=="" else smetododepago
     sdni=input("Dni: ")
     dni=None if sdni=="" else sdni
-    
-    
 
     sql="""INSERT INTO Asistente(nombre, apellido1, apellido2, telefono,correo, metodoDePago, dni)
     values (%(a)s,%(b)s,%(c)s,%(d)s,%(e)s,%(f)s,%(g)s)"""
@@ -153,28 +153,40 @@ def insert_Asistente(conn):
                 elif("dni" in e.pgerror):
                     print(f"{bcolors.WARNING}dni no puede estar duplicado{bcolors.ENDC}")
             else:
-                print(f"Erro: {e.pgcode} - {e.pgerror}")
+                print(e)
             conn.rollback()
         except AttributeError as e:
             print(f"{bcolors.WARNING}Numero de targeta no puede ser nulo{bcolors.ENDC}")
             conn.rollback()
 
+def select_poniente_by_dni(conn, dni,control_tx=True):
+    query = "SELECT id FROM poniente WHERE poniente.dni = %(dni)s"
+    with conn.cursor() as cursor:
+        cursor.execute(query, {'dni': dni})
+        row = cursor.fetchone()
+        if control_tx:
+            conn.commit()
+        return row[0] if row else None
+        
+def select_initfecha_by_poniente(conn, poniente_id,control_tx=True):
+    select = "SELECT initfecha, finfecha FROM taller WHERE taller.idponiente = %(poniente_id)s"
+    with conn.cursor() as cursor:
+        cursor.execute(select, {'poniente_id': poniente_id})
+        if control_tx:
+            conn.commit()
+        return cursor.fetchall()
+
 def insert_Taller(conn):
+    conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_SERIALIZABLE)
     sponiente=input("Dni poniente: ")
     ponitente=None if sponiente=="" else sponiente
-    query="""
-    Select id from poniente where poniente.dni = %(a)s
-    """
     with conn.cursor() as cursor:
-        try:
-            cursor.execute(query,{'a':ponitente})
-            row = cursor.fetchone()
-            if(row == None):
+        try:  
+            poniente = select_poniente_by_dni(conn,sponiente,control_tx=False)
+            if(poniente == None):
                 print(f"{bcolors.WARNING}No existe ese poniente{bcolors.ENDC}")
                 conn.rollback()
             else:
-                
-                poniente=row[0]
                 snombre=input("Nombre: ")
                 nombre=None if snombre=="" else snombre
                 sespecialidad=input("Especialidad (0-> SequreApi, 1->OSINT, 2-> Reversing): ")
@@ -182,15 +194,11 @@ def insert_Taller(conn):
                 sinitFecha = input("Ingrese una fecha de inicio en formato yyyy-mm-dd: ")
                 sfinFecha = input("Ingrese una fecha de fin en formato yyyy-mm-dd: ")
                 sPrecio=input("Precio: ")
-                precio = None if sPrecio=="" else float(sPrecio)
-                select="""
-                        Select initfecha,finfecha from taller where taller.idponiente = %(a)s
-                        """
+                precio = None if sPrecio=="" else float(sPrecio)            
                 try:
                     initFecha = datetime.strptime(sinitFecha, "%Y-%m-%d").date()
                     finFecha = datetime.strptime(sfinFecha, "%Y-%m-%d").date()
-                    cursor.execute(select,{'a': poniente})
-                    row = cursor.fetchall()
+                    row=select_initfecha_by_poniente(conn,poniente)
                     if(len(row)!= 0):
                         for r in row:
                             if(r[0]<=initFecha<=r[1]):
@@ -224,7 +232,7 @@ def insert_Taller(conn):
                         elif("finfecha" in e.pgerror):
                             print(f"{bcolors.WARNING}2 eventos no pueden acabar el mismo dia{bcolors.ENDC}")
                     else:
-                        print(f"Erro: {e.pgcode} - {e.pgerror}")
+                        raise e
                     conn.rollback()
 
 
@@ -234,69 +242,75 @@ def insert_Taller(conn):
             
             
 
+def select_id_asistente(conn, asistente,control_tx=True):
+    select = "SELECT id FROM asistente WHERE asistente.dni = %(a)s"
+    with conn.cursor() as cursor:
+        cursor.execute(select, {'a': asistente})
+        row = cursor.fetchone()
+        if row is None:
+            if control_tx:
+                conn.rollback()
+            print(f"{bcolors.WARNING}No existe ese asistente{bcolors.ENDC}")
+            return None
+        else:
+            if control_tx:
+                conn.commit()
+            return row[0]
+
 def insert_TallerAsistente(conn):
-    sasistente=input("Dni del asistente: ")
-    asistente=None if sasistente=="" else sasistente
-    staller=input('Numero del taller: ')
-    taller= None if staller =="" else staller
-    select="""
-    Select id from asistente where asistente.dni = %(a)s
-    """
-    query="""
-        insert into TallerAsistente(idTaller,idAsistente) values (%(a)s,%(b)s)
-    """
+    conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_SERIALIZABLE)
+    sasistente = input("Dni del asistente: ")
+    asistente = None if sasistente == "" else sasistente
+    staller = input('Numero del taller: ')
+    taller = None if staller == "" else staller
+    
+    query = "INSERT INTO TallerAsistente (idTaller, idAsistente) VALUES (%(a)s, %(b)s)"
+    
     with conn.cursor() as cursor:
         try:
-            cursor.execute(select,{'a':asistente})
-            row = cursor.fetchone()
-            if(row == None):
-                print(f"{bcolors.WARNING}No existe ese asistente{bcolors.ENDC}")
+            asis = select_id_asistente(conn, asistente,control_tx=False)
+            if asis is None:
                 conn.rollback()
-                
             else:
-                asis=row[0]
                 try:
-                    cursor.execute(query,{'a':taller ,'b':asis })
-                    print(f"{bcolors.OKGREEN}Asistente alistado con éxito{bcolors.ENDC}")   
+                    cursor.execute(query, {'a': taller, 'b': asis})
+                    print(f"{bcolors.OKGREEN}Asistente alistado con éxito{bcolors.ENDC}")
                     conn.commit()
                 except psycopg2.Error as e:
-                    if(e.pgcode == psycopg2.errorcodes.NOT_NULL_VIOLATION):
-                        if("idTaller" in e.pgerror):
+                    if e.pgcode == psycopg2.errorcodes.NOT_NULL_VIOLATION:
+                        if "idTaller" in e.pgerror:
                             print(f"{bcolors.WARNING}idTaller no puede ser nulo{bcolors.ENDC}")
-                        elif("idAsistente" in e.pgerror):
+                        elif "idAsistente" in e.pgerror:
                             print(f"{bcolors.WARNING}idAsistente no puede ser nulo{bcolors.ENDC}")
-                    elif(e.pgcode == psycopg2.errorcodes.FOREIGN_KEY_VIOLATION):
-                        if("tallerasitente_fk_taller" in e.pgerror):
+                    elif e.pgcode == psycopg2.errorcodes.FOREIGN_KEY_VIOLATION:
+                        if "tallerasitente_fk_taller" in e.pgerror:
                             print(f"{bcolors.WARNING}No existe ese numero de taller{bcolors.ENDC}")
                     else:
-                        print(f"Erro: {e.pgcode} - {e.pgerror}")
+                        raise e
                 conn.rollback()
         except psycopg2.Error as e:
             conn.rollback()
             raise e
+
+
 def delete_asistenteDeUnTaller(conn):
-    sasistente=input("Dni del asistente: ")
-    asistente=None if sasistente=="" else sasistente
-    staller=input('Numero del taller: ')
-    taller= None if staller =="" else staller
-    select="""
-    Select id from asistente where asistente.dni = %(a)s
-    """
-    query="""
-        Delete from TallerAsistente where TallerAsistente.idTaller = %(a)s and TallerAsistente.idasistente = %(b)s
-    """
+    conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_READ_COMMITTED)
+    sasistente = input("Dni del asistente: ")
+    asistente = None if sasistente == "" else sasistente
+    staller = input('Numero del taller: ')
+    taller = None if staller == "" else staller
+    
+    query = "DELETE FROM TallerAsistente WHERE TallerAsistente.idTaller = %(a)s AND TallerAsistente.idasistente = %(b)s"
+    
     with conn.cursor() as cursor:
-            cursor.execute(select,{'a':asistente})
-            row = cursor.fetchone()
-            if(row == None):
-                print(f"{bcolors.WARNING}No existe ese asistente{bcolors.ENDC}")
+        try:
+            idasistente = select_id_asistente(conn, asistente)
+            if idasistente is None:
                 conn.rollback()
-                
             else:
-                idasistente=row[0]
                 try:
-                    cursor.execute(query,{'a':taller, 'b': idasistente})
-                    if(cursor.rowcount == 0):
+                    cursor.execute(query, {'a': taller, 'b': idasistente})
+                    if cursor.rowcount == 0:
                         print(f"{bcolors.WARNING}No existe ese taller{bcolors.ENDC}")
                     else:
                         print(f"{bcolors.OKGREEN}Asistente eliminado del taller{bcolors.ENDC}")
@@ -304,10 +318,14 @@ def delete_asistenteDeUnTaller(conn):
                     
                 except psycopg2.Error as e:
                     conn.rollback()
-                    print(f"Erro: {e.pgcode} - {e.pgerror}")
+                    raise e
                     
                 except Exception as e:
-                    raise e;
+                    raise e
+        except psycopg2.Error as e:
+            conn.rollback()
+            raise e
+
 
     
 def print_table(rows,column_names):
@@ -336,6 +354,7 @@ def print_table(rows,column_names):
 
            
 def select_todos_asistentes_de_un_taller(conn):
+    conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_READ_COMMITTED)
     staller=input('Numero del taller: ')
     taller= None if staller =="" else staller
     query = """
@@ -358,6 +377,7 @@ def select_todos_asistentes_de_un_taller(conn):
             raise e
 
 def select_ponente_de_un_taller(conn):
+    conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_READ_COMMITTED)
     staller = input("ID del taller: ")
     taller= None if staller =="" else staller
     query = """
@@ -378,7 +398,10 @@ def select_ponente_de_un_taller(conn):
         except  psycopg2.Error as e:
             conn.rollback()
             raise e
+
+
 def select_todos_tallers(conn):
+    conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_READ_COMMITTED)
     query = """
     SELECT *
     FROM Taller
@@ -392,16 +415,27 @@ def select_todos_tallers(conn):
         else:
             print(f"{bcolors.WARNING}No se encontro ningun taller{bcolors.ENDC}")
         
-        
+def select_precio_taller(conn, taller,control_tx=True):
+    query_price = "SELECT precio FROM Taller WHERE id = %(a)s"
+    with conn.cursor() as cursor:
+        cursor.execute(query_price, {'a': taller})
+        row = cursor.fetchone()
+        if row is None:
+            if control_tx:
+                conn.rollback()
+            print(f"{bcolors.WARNING}No existe ese taller{bcolors.ENDC}")
+            return None
+        else:
+            if control_tx:
+                conn.commit()
+            return row[0]   
+           
 def cambiar_precio_taller(conn):
+    conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_SERIALIZABLE)
     staller = input("ID del taller: ")
     taller= None if staller =="" else staller
     sdescuento= input("descuento que quieres aplicar: ")
     descuento= None if sdescuento =="" else float(sdescuento)
-    query_price = """
-    SELECT precio FROM Taller
-    WHERE id = %(a)s
-    """
     query = """
         UPDATE Taller
         SET precio = %(a)s
@@ -410,53 +444,133 @@ def cambiar_precio_taller(conn):
     with conn.cursor() as cursor:
         
         try:
-            cursor.execute(query_price, {'a': taller})
-            row = cursor.fetchone()
-            if(row == None):
-                print(f"{bcolors.WARNING}No existe ese taller{bcolors.ENDC}")
+            precio = select_precio_taller(conn,taller,control_tx=False)
+            if(precio == None):
                 conn.rollback()
             else:
-                precio_actual=row[0]
-                nuevo_precio = precio_actual * (1-descuento)
+                precio
+                nuevo_precio = precio * (1-descuento)
                 cursor.execute(query, {'a': nuevo_precio, 'b':taller })
                 print(f"{bcolors.OKGREEN}Descuento aplicado.{bcolors.ENDC}")
                 conn.commit()
         except psycopg2.Error as e:
             conn.rollback()
             raise e
-        except TypeError as e:
-            print(f"{bcolors.WARNING}El valor del descuento no puede ser nulo{bcolors.ENDC}")
-            conn.rollback()           
+        
 
+def obtener_informacion_taller(conn, id_taller,control_tx=True):
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT * FROM Taller WHERE id = %s", (id_taller,))
+        row=cursor.fetchone()
+        if row is None:
+            if control_tx:
+                conn.rollback()
+
+            return None
+        else:
+            if control_tx:
+                conn.commit()
+            return row   
+           
+def actualizar_reputacion_poniente(conn, id_poniente,control_tx=True):
+    with conn.cursor() as cursor:
+        try:
+            cursor.execute("UPDATE Poniente SET reputacion = reputacion - 10 WHERE id = %s", (id_poniente,))
+            if control_tx:
+                conn.commit()
+            return True
+        except psycopg2.Error as e:
+            if(e.pgcode== psycopg2.errorcodes.CHECK_VIOLATION):
+                if("reputacion_non_negative" in e.pgerror):
+                    if control_tx:
+                        conn.rollback()
+                    return False     
+            conn.rollback()
+            raise e;
+                
+            
+def obtener_asistentes_taller(conn, id_taller, control_tx=True):
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT idAsistente FROM TallerAsistente WHERE idTaller = %s", (id_taller,))
+        asistentes = [a[0] for a in cursor.fetchall()]
+
+        if asistentes is None:
+            if control_tx:
+                conn.rollback()
+            return None
+
+        if control_tx:
+            conn.commit()
+
+        return asistentes
+
+
+    
+def insertar_nuevo_taller(conn, id_poniente, nombre, especialidad, init_fecha, fin_fecha, precio,control_tx=True):
+    query = "INSERT INTO Taller (idPoniente, nombre, especialidad, initFecha, finFecha, precio) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id"
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(query, (id_poniente, nombre, especialidad, init_fecha, fin_fecha, precio))
+            created_id = cursor.fetchone()[0]
+            if control_tx:
+                conn.commit()
+        return created_id
+    except psycopg2.Error as e:
+        if control_tx:
+            conn.rollback()
+        return None
+
+
+def eliminar_taller(conn, id_taller,control_tx=True):
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("DELETE FROM Taller WHERE id = %s", (id_taller,))
+            if control_tx:
+                conn.commit()
+        return True
+    except psycopg2.Error as e:
+        if control_tx:
+            conn.rollback()
+        return False
+    
+
+    
 def eliminar_taller_y_descuento(conn):
+    conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_SERIALIZABLE)
+    
     staller = input("ID del taller: ")
     id_taller= None if staller =="" else staller
     with conn.cursor() as cursor:
         try:
-        # Obtener información del taller a eliminar
-            cursor.execute("SELECT * FROM Taller WHERE id = %s", (id_taller,))
-            row = cursor.fetchone()
+            row = obtener_informacion_taller(conn,id_taller,control_tx=False)
             if row == None:
                 print(f"{bcolors.WARNING}No existe ese taller{bcolors.ENDC}")
-                conn.rollback()
+                conn.rollback()                
             else:
-                cursor.execute("UPDATE Poniente SET reputacion = reputacion - 10 WHERE id=%s", (row[1],))
-                cursor.execute("SELECT idAsistente FROM TallerAsistente WHERE idTaller = %s", (id_taller,))
-                asistentes = [a[0] for a in cursor.fetchall()]
-                
-                nueva_fecha_init = row[4] + timedelta(days=7)
-                nueva_fecha_fin = row[5] + timedelta(days=7)
-                cursor.execute("INSERT INTO Taller (idPoniente, nombre, especialidad, initFecha, finFecha, precio) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
-                            (row[1], row[2], row[3], nueva_fecha_init, nueva_fecha_fin, row[6] // 2))
-                nuevo_id_taller = cursor.fetchone()[0]
+                id_poniente = row[0]
+                update=actualizar_reputacion_poniente(conn,id_poniente,control_tx=False)
+                if update == False:
+                   print(f"{bcolors.WARNING}Error: La reputación del poniente no puede bajar más.{bcolors.ENDC}")
+                   conn.rollback()
+                else:
+                    
+                    asistentes = obtener_asistentes_taller(conn,id_taller,control_tx=False)
+                    
+                    nueva_fecha_init = row[4] + timedelta(days=7)
+                    nueva_fecha_fin = row[5] + timedelta(days=7)
+                    id_nuevo_taller=insertar_nuevo_taller(conn,row[1], row[2], row[3], nueva_fecha_init, nueva_fecha_fin, row[6]/2,control_tx=False)
+                    if id_nuevo_taller == None:
+                        print(f"{bcolors.WARNING}Error al insertar un nuevo taller: {e}{bcolors.ENDC}")
+                    else: 
+                        for asistente in asistentes:
+                            cursor.execute("INSERT INTO TallerAsistente (idTaller, idAsistente) VALUES (%s, %s)", (id_nuevo_taller, asistente))
 
-                for asistente in asistentes:
-                    cursor.execute("INSERT INTO TallerAsistente (idTaller, idAsistente) VALUES (%s, %s)", (nuevo_id_taller, asistente))
-
-                cursor.execute("DELETE FROM Taller WHERE id = %s", (id_taller,))
-
-                conn.commit()
-                print(f"{bcolors.OKGREEN}Transaccion realizada.{bcolors.ENDC}")
+                        eliminar=eliminar_taller(conn,id_taller,control_tx=False)
+                        if eliminar==False:
+                            print(f"{bcolors.WARNING}Error al eliminar el taller: {e}{bcolors.ENDC}")
+                        else:
+                            conn.commit()
+                            print(f"{bcolors.OKGREEN}Transaccion realizada.{bcolors.ENDC}")
 
 
             
